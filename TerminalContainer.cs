@@ -32,8 +32,7 @@ public class TerminalContainer : Control
                 var posY = pointerY * Terminal.FontSizeY;
 
                 DrawRect(new Rect2(posX, posY, Terminal.FontSizeX, Terminal.FontSizeY), glyph.BackgroundColor);
-                DrawString(Terminal.Font, new Vector2(posX, posY + Terminal.FontSizeY), glyph.Character + "",
-                    glyph.ForegroundColor);
+                DrawString(Terminal.Font, new Vector2(posX, posY + Terminal.FontSizeY), glyph.Character + "", glyph.ForegroundColor);
                 pointerX++;
             }
 

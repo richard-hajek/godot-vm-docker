@@ -32,8 +32,28 @@ you can use add this repo as submodule.
 
 ## Usage
 
-1. Enable plugin in Project->Project Settings->Plugins
+1. Enable plugin in Project -> Project Settings -> Plugins
 2. Add node `VM Bridge Manager` under the root of your project. Do *NOT* change it's name.
 3. Add any PCs into the scene
 4. Add mesh to the PCs, this mesh will be clickable, and should represent a terminal, screen etc...
 5. Test it!
+
+## Troubleshooting
+
+### Godot build fails with `The type or namespace name 'VagrantBridge' could not be found` (or similar)
+
+This is caused by missing references in `.csproj` file.
+One needs to reference `.cs` files, because Godot does not do that automatically.
+
+Search your `.csproj` file for lines like so:
+
+```
+  <ItemGroup>
+    <Compile Include="addons\godot-virtual-machines\BridgeContainer.cs"/>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+```
+
+And replace any `<Compile Include="addons\godot-virtual-machines\<anything>.cs">`
+with just `<Compile Include="addons\**\*.cs"/>`
+
