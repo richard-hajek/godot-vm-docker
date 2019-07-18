@@ -1,7 +1,7 @@
 using Godot;
 
 [Tool]
-public class NetworkManager : Node
+public class BridgeContainer : Node
 {
     public VagrantBridge VagrantBridge;
 

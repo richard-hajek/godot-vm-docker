@@ -33,7 +33,7 @@ you can use add this repo as submodule.
 ## Usage
 
 1. Enable plugin in Project -> Project Settings -> Plugins
-2. Add node `VM Bridge Manager` under the root of your project. Do *NOT* change it's name.
+2. Add node `VM Manager` under the root of your project. Do *NOT* change it's name.
 3. Add any PCs into the scene
 4. Add mesh to the PCs, this mesh will be clickable, and should represent a terminal, screen etc...
 5. Test it!
