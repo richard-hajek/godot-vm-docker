@@ -1,14 +1,14 @@
-# Godot Virtual Machines and Docker Containers
+# Godot Virtual Machine based Docker Containers
 
 Welcome!
-This plugin allows one to add VM and Docker support and interaction to any Godot project!
-It is a base for an upcoming game called Hackfest!
+This plugin allows one to add Docker container support and interaction to any Godot project!
+It is a base for an upcoming game called *Hackfest*!
 
 ## Info
 - Natively allows one to use *Dockerfiles* within the editor
-- In-game objects can be made computer peripherals - making them accessible from within the docker container
-- Uses a separate virtual machine to run docker daemon
-which in turn runs the docker images
+- In-game objects can be made computer peripherals - making them accessible from within the container
+- Uses a separate *virtual machine* to run *Docker containers*
+(Meaning you cannot run other VMs without hacking the plugin, main focus is to support many Docker containers)
 - Does *NOT* require privileges to run (achieving that was rough)
 
 ## Dependencies
@@ -20,14 +20,14 @@ which in turn runs the docker images
 
 ### Cloning
 
-- Clone this repository into `addons/godot-virtual-machines`
+- Clone this repository into `addons/godot-vm-docker`
 
 ### Git Submodule
 
 If your project is version controlled by Git, 
 you can use add this repo as submodule.
 
-- Execute `git submodule add git@github.com:meowxiik/godot-virtual-machines.git addons/godot-virtual-machines` in the project root
+- Execute `git submodule add git@github.com:meowxiik/godot-vm-docker.git addons/godot-vm-docker` in the project root
 
 
 ## Usage
@@ -57,3 +57,7 @@ Search your `.csproj` file for lines like so:
 And replace any `<Compile Include="addons\godot-virtual-machines\<anything>.cs">`
 with just `<Compile Include="addons\**\*.cs"/>`
 
+### Scene takes forever to load!
+There is little that can be done about that.
+The `VM Manager` node needs to complete the boot process, to make sure all simulated computers have the docker daemon available.
+I suggest you prepare a loading scene.
