@@ -60,4 +60,5 @@ with just `<Compile Include="addons\**\*.cs"/>`
 ### Scene takes forever to load!
 The `VM Bridge Manager` node needs to complete the boot process of the VM, to make sure all simulated computers have the docker daemon available.
 I suggest you prepare a loading scene for now.
-I am do plan on preparing a EarlyBoot() static call though, which would make it possible to preboot the VM, removing the loading time.
+
+I do plan on preparing a EarlyBoot() static call though, which would make it possible to preboot the VM.
