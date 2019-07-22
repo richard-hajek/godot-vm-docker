@@ -1,7 +1,6 @@
 using System;
 using Godot;
 
-[Tool]
 public class PeripheralContainer : Node
 {
     [Export] public string Id = "";

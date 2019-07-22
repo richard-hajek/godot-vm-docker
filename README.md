@@ -8,7 +8,7 @@ It is a base for an upcoming game called *Hackfest*!
 - Natively allows one to use *Dockerfiles* within the editor
 - In-game objects can be made computer peripherals - making them accessible from within the container
 - Uses a separate *virtual machine* to run *Docker containers*
-(Meaning you cannot run other VMs without hacking the plugin, main focus is to support many Docker containers)
+(Meaning you cannot run other VMs without hacking the plugin, main focus is to support multiple Docker containers)
 - Does *NOT* require privileges to run (achieving that was rough)
 
 ## Dependencies
@@ -20,7 +20,7 @@ It is a base for an upcoming game called *Hackfest*!
 
 ### Cloning
 
-- Clone this repository into `addons/godot-vm-docker`
+- Clone using `git clone git@github.com:meowxiik/godot-vm-docker.git addons/godot-vm-docker` in your project root
 
 ### Git Submodule
 
@@ -33,9 +33,9 @@ you can use add this repo as submodule.
 ## Usage
 
 1. Enable plugin in Project -> Project Settings -> Plugins
-2. Add node `VM Manager` under the root of your project. Do *NOT* change it's name.
+2. Add node `VM Bridge Manager` under the root of your project. It *MUST* be directly beneath the project root node.
 3. Add any PCs into the scene
-4. Add mesh to the PCs, this mesh will be clickable, and should represent a terminal, screen etc...
+4. Add StaticBody to the PCs, this mesh will be clickable, and should represent a terminal, screen etc...
 5. Test it!
 
 ## Troubleshooting

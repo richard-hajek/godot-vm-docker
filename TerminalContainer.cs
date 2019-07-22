@@ -1,10 +1,27 @@
 using Godot;
 
-[Tool]
 public class TerminalContainer : Control
 {
     public Terminal Terminal;
 
+    public TerminalContainer()
+    {
+        Visible = false;
+        Terminal = new Terminal(GetFont("arial"), RectSize);
+    }
+
+    public void Open(ComputerContainer container)
+    {
+        var bridge = GetNode<BridgeContainer>("/VM Bridge Manager");
+        bridge.VagrantBridge.AttachToComputer(container.Computer, out var stdin, out var stdout, out var stderr, true);
+        Terminal.Open(stdin, stdout);
+    }
+
+    public void Close()
+    {
+        Terminal.Close();
+    }
+    
     public override void _EnterTree()
     {
         Terminal = new Terminal(GetFont("arial"), RectSize);
@@ -44,6 +61,18 @@ public class TerminalContainer : Control
     {
         base._Input(@event);
 
-        if (@event is InputEventKey key) Terminal.OnInput((char) key.Unicode);
+        if (!Visible)
+            return;
+        
+        if (@event is InputEventKey key)
+        {
+            if (key.Unicode == (int) KeyList.Escape)
+            {
+                Close();
+                return;
+            }
+            
+            Terminal.OnInput((char) key.Unicode);
+        }
     }
 }
