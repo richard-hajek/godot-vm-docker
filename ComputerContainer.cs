@@ -29,7 +29,6 @@ public class ComputerContainer : Spatial
         Bridge = null;
 
         var rootNode = GetTree().Root.GetChildren()[0] as Node;
-        
         foreach (var child in rootNode.GetChildren())
         {
             if (child is BridgeContainer c)
@@ -42,8 +41,28 @@ public class ComputerContainer : Spatial
                 }
             }
         }
+        if (Bridge == null)
+        {
+            throw new Exception("Did not find a bridge!");
+        }
+    }
 
-        GD.Print($"Bridge found: {Bridge != null}");
+    public override void _Ready()
+    {
+        Bridge.VagrantBridge.PrepareComputer(Computer);
+        Bridge.VagrantBridge.StartComputer(Computer);
+    }
+
+    public void OpenTerminal(TerminalContainer terminalContainer)
+    {
+        if (Bridge.DryMode)
+        {
+            GD.PrintErr("Dry Mode active, refusing to open a terminal.");
+            return;
+        }
+        
+        Bridge.VagrantBridge.AttachToComputer(Computer, out var stdin, out var stdout, out var stderr, true);
+        terminalContainer.Open(stdin, stdout);
     }
 
     public IEnumerable<Peripheral> GetPeripherals()

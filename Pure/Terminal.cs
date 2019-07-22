@@ -6,6 +6,7 @@ using Thread = System.Threading.Thread;
 [Tool]
 public class Terminal
 {
+
     private int _currentAttributes;
     private readonly Color _currentBackground = Colors.Black;
     private readonly Color _currentForeground = Colors.White;
@@ -24,6 +25,8 @@ public class Terminal
     public List<Line> Lines = new List<Line>();
 
     public Node Parent;
+
+    public event ScreenUpdatedDelegate ScreenUpdated;
 
     public Terminal(Font font, Vector2 termSize)
     {
@@ -84,6 +87,8 @@ public class Terminal
         };
 
         _cursorMove(1, 0, true, true);
+
+        ScreenUpdated?.Invoke();
     }
 
     public void OnInput(char c)
@@ -148,4 +153,6 @@ public class Terminal
     {
         internal Glyph[] Columns;
     }
+
+    public delegate void ScreenUpdatedDelegate();
 }

@@ -20,8 +20,7 @@ public class BridgeContainer : Node
     {
         if (DryMode)
             return;
-        
-        
+
         VagrantBridge.Stop();
         VagrantBridge = null;
     }

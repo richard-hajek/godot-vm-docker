@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text;
 using Godot;
 
 public class TerminalContainer : Control
@@ -8,30 +10,24 @@ public class TerminalContainer : Control
     {
         Visible = false;
         Terminal = new Terminal(GetFont("arial"), RectSize);
+        Terminal.ScreenUpdated += Update;
     }
 
-    public void Open(ComputerContainer container)
+    public void Open(StreamWriter stdin, StreamReader stdout)
     {
-        var bridge = GetNode<BridgeContainer>("/VM Bridge Manager");
-        bridge.VagrantBridge.AttachToComputer(container.Computer, out var stdin, out var stdout, out var stderr, true);
+        Visible = true;
         Terminal.Open(stdin, stdout);
     }
 
     public void Close()
     {
         Terminal.Close();
+        Visible = false;
     }
     
     public override void _EnterTree()
     {
         Terminal = new Terminal(GetFont("arial"), RectSize);
-        Terminal.OnOutput('h');
-        Terminal.OnOutput('e');
-        Terminal.OnOutput('l');
-        Terminal.OnOutput('l');
-        Terminal.OnOutput('o');
-        Terminal.OnOutput('\n');
-        Terminal.OnOutput('o');
     }
 
     public override void _Draw()
@@ -66,13 +62,21 @@ public class TerminalContainer : Control
         
         if (@event is InputEventKey key)
         {
+            if (key.Echo)
+                return;
+
+            if (!key.Pressed)
+                return;
+                
             if (key.Unicode == (int) KeyList.Escape)
             {
                 Close();
                 return;
             }
+
+            var ascii = Encoding.ASCII.GetChars(new[] {(byte) key.Unicode});
             
-            Terminal.OnInput((char) key.Unicode);
+            Terminal.OnInput(ascii[0]);
         }
     }
 }
