@@ -1,16 +1,29 @@
+using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using Godot;
 
 public class TerminalContainer : Control
 {
     public Terminal Terminal;
+    
+    private List<int> _modifierKeys = new List<int>
+    {
+        (int) KeyList.Shift,
+        (int) KeyList.Alt,
+        (int) KeyList.Control,
+        (int) KeyList.Capslock,
+        (int) KeyList.Numlock,
+        (int) KeyList.Scrolllock
+    };
 
     public TerminalContainer()
     {
         Visible = false;
-        Terminal = new Terminal(GetFont("arial"), RectSize);
-        Terminal.ScreenUpdated += Update;
+    }
+
+    public void Open(ComputerContainer computer)
+    {
+        computer.OpenTerminal(this);
     }
 
     public void Open(StreamWriter stdin, StreamReader stdout)
@@ -28,6 +41,7 @@ public class TerminalContainer : Control
     public override void _EnterTree()
     {
         Terminal = new Terminal(GetFont("arial"), RectSize);
+        Terminal.ScreenUpdated += Update;
     }
 
     public override void _Draw()
@@ -36,20 +50,24 @@ public class TerminalContainer : Control
 
         short pointerX = 0;
         short pointerY = 0;
-        foreach (var line in Terminal.Lines)
+        lock (Terminal.Lines)
         {
-            pointerX = 0;
-            foreach (var glyph in line.Columns)
+            foreach (var line in Terminal.Lines)
             {
-                var posX = pointerX * Terminal.FontSizeX;
-                var posY = pointerY * Terminal.FontSizeY;
+                pointerX = 0;
+                foreach (var glyph in line.Columns)
+                {
 
-                DrawRect(new Rect2(posX, posY, Terminal.FontSizeX, Terminal.FontSizeY), glyph.BackgroundColor);
-                DrawString(Terminal.Font, new Vector2(posX, posY + Terminal.FontSizeY), glyph.Character + "", glyph.ForegroundColor);
-                pointerX++;
+                    var posX = pointerX * Terminal.FontSizeX;
+                    var posY = pointerY * Terminal.FontSizeY;
+
+                    DrawRect(new Rect2(posX, posY, Terminal.FontSizeX, Terminal.FontSizeY), glyph.BackgroundColor);
+                    DrawString(Terminal.Font, new Vector2(posX, posY + Terminal.FontSizeY), glyph.Character + "", glyph.ForegroundColor);
+                    pointerX++;
+                }
+
+                pointerY++;
             }
-
-            pointerY++;
         }
     }
 
@@ -67,16 +85,40 @@ public class TerminalContainer : Control
 
             if (!key.Pressed)
                 return;
-                
-            if (key.Unicode == (int) KeyList.Escape)
+            
+            if (key.Scancode == (int) KeyList.Escape)
             {
                 Close();
                 return;
             }
 
-            var ascii = Encoding.ASCII.GetChars(new[] {(byte) key.Unicode});
+            if (_modifierKeys.Contains(key.Scancode))
+            {
+                return;
+            }
             
-            Terminal.OnInput(ascii[0]);
+            GD.Print($"Accepting unicode char: {key.Unicode}");
+            GD.Print($"With char: {(char) key.Unicode}");
+            
+            var character = (char) key.Unicode;
+
+            if (key.Scancode == (int) KeyList.Enter)
+            {
+                character = (char) ASCII.LF;
+            }
+
+            if (key.Scancode == (int) KeyList.Backspace)
+            {
+                character = (char) ASCII.BS;
+            }
+
+            if (key.Scancode == (int) KeyList.Delete)
+            {
+                character = (char) ASCII.DEL;
+            }
+            
+            Terminal.OnInput(character);
         }
     }
+    
 }

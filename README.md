@@ -34,9 +34,14 @@ you can use add this repo as submodule.
 
 1. Enable plugin in Project -> Project Settings -> Plugins
 2. Add node `VM Bridge Manager` under the root of your project. It *MUST* be directly beneath the project root node.
-3. Add any PCs into the scene
-4. Add StaticBody to the PCs, this mesh will be clickable, and should represent a terminal, screen etc...
-5. Test it!
+3. Add node `Computer`
+4. Open the `Computer` node inspector, set a Dockerfile, for example:
+ ```
+ FROM busybox
+ CMD sh
+ ```
+5. Add control `Terminal`
+6. When you want to open a terminal for a computer execute `terminalNode.Open(computerNode)`
 
 ## Troubleshooting
 
@@ -62,3 +67,13 @@ The `VM Bridge Manager` node needs to complete the boot process of the VM, to ma
 I suggest you prepare a loading scene for now.
 
 I do plan on preparing an EarlyBoot() static call though, which would make it possible to preboot the VM.
+
+### The VM stays running even after the game was killed!
+This is a known issue, for which I apologize and will fix before reaching plugin version 1.0.
+VM shutdown relies on Godot's _OnTreeExit(), so if the game is abruptly killed, the VM stays running.
+You can manually kill it by killing VirtualBox's process in process explorer.
+Since the plugin has no use for the machine after it quits and will reset it on next boot anyway, any damage done to it is irrelevant.
+
+### Terminal emulator behaves weirdly!
+Terminal is highly WIP currently, as best described by `unsupported = true` on every two lines in `Terminal.cs`.
+But please do report any bugs!
