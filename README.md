@@ -69,7 +69,7 @@ I suggest you prepare a loading scene for now.
 I do plan on preparing an EarlyBoot() static call though, which would make it possible to preboot the VM.
 
 ### The VM stays running even after the game was killed!
-This is a known issue, for which I apologize and will fix before reaching plugin version 1.0.
+This is a known issue, for which I apologize and will fix before reaching stable version.
 VM shutdown relies on Godot's _OnTreeExit(), so if the game is abruptly killed, the VM stays running.
 You can manually kill it by killing VirtualBox's process in process explorer.
 Since the plugin has no use for the machine after it quits and will reset it on next boot anyway, any damage done to it is irrelevant.
