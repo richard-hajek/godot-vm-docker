@@ -35,7 +35,7 @@ you can use add this repo as submodule.
 1. Enable plugin in Project -> Project Settings -> Plugins
 2. Add node `VM Bridge Manager` under the root of your project. It *MUST* be directly beneath the project root node.
 3. Add node `Computer`
-4. Open the `Computer` node inspector, set a Dockerfile, for example:
+4. Open the `Computer` node in inspector, set a Dockerfile, for example:
  ```
  FROM busybox
  CMD sh
