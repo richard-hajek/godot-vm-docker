@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using hackfest2.addons.Utils;
 
 public class ComputerContainer : Spatial
 {
@@ -18,37 +19,23 @@ public class ComputerContainer : Spatial
     public override void _EnterTree()
     {
         base._EnterTree();
+        
+        var rootNode = GetTree().Root.GetChildren()[0] as Node;
+        Bridge = Nodes.FindChildOfType<BridgeContainer>(rootNode);
+        
+        if (Bridge == null)
+            throw new Exception("Did not find a bridge!");
+    }
 
+    public override void _Ready()
+    {
         Computer = new Computer
         {
             Peripherals = GetPeripherals().ToList(),
             Id = Id,
             Dockerfile = Dockerfile
         };
-
-        Bridge = null;
-
-        var rootNode = GetTree().Root.GetChildren()[0] as Node;
-        foreach (var child in rootNode.GetChildren())
-        {
-            if (child is BridgeContainer c)
-            {
-                if (Bridge == null)
-                    Bridge = c;
-                else
-                {
-                    throw new Exception("Cannot have more than one bridge container!");
-                }
-            }
-        }
-        if (Bridge == null)
-        {
-            throw new Exception("Did not find a bridge!");
-        }
-    }
-
-    public override void _Ready()
-    {
+        
         Bridge.VagrantBridge.PrepareComputer(Computer);
         Bridge.VagrantBridge.StartComputer(Computer);
     }
@@ -68,7 +55,7 @@ public class ComputerContainer : Spatial
     public IEnumerable<Peripheral> GetPeripherals()
     {
         foreach (var child in GetChildren())
-            if (child is Peripheral p)
-                yield return p;
+            if (child is PeripheralContainer p)
+                yield return p.Peripheral;
     }
 }

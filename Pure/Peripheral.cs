@@ -8,5 +8,6 @@ public class Peripheral
 
     public void Start(StreamReader ingoing, StreamWriter outgoing)
     {
+        
     }
 }
