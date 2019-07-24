@@ -96,10 +96,7 @@ public class TerminalContainer : Control
             {
                 return;
             }
-            
-            GD.Print($"Accepting unicode char: {key.Unicode}");
-            GD.Print($"With char: {(char) key.Unicode}");
-            
+
             var character = (char) key.Unicode;
 
             if (key.Scancode == (int) KeyList.Enter)

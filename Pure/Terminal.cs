@@ -144,7 +144,6 @@ public class Terminal
                 }
                 else
                 {
-                    GD.Print($"Executing ESC {_escapeSequence}");
                     _executeEscNonCSI(c);
                     _escapeState = EscapeStates.NoEscape;
                     return true;
@@ -178,7 +177,6 @@ public class Terminal
                         _argumentInWriting = "";
                     }
                     
-                    GD.Print($"Executing CSI {_escapeSequence}");
                     _executeCSI( c, _escapeArguments);
                     
                     _escapeArguments.Clear();

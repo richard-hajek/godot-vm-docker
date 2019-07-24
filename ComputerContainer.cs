@@ -25,16 +25,19 @@ public class ComputerContainer : Spatial
         
         if (Bridge == null)
             throw new Exception("Did not find a bridge!");
+        
+        Computer = new Computer
+        {
+            Peripherals = new List<Peripheral>(),
+            Id = Id,
+            Dockerfile = Dockerfile
+        };
     }
 
     public override void _Ready()
     {
-        Computer = new Computer
-        {
-            Peripherals = GetPeripherals().ToList(),
-            Id = Id,
-            Dockerfile = Dockerfile
-        };
+        if (Bridge.DryMode)
+            return;
         
         Bridge.VagrantBridge.PrepareComputer(Computer);
         Bridge.VagrantBridge.StartComputer(Computer);

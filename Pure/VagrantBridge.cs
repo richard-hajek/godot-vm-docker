@@ -36,6 +36,10 @@ public class VagrantBridge
     public void StartComputer(Computer computer)
     {
         VagrantController.DockerContainerStart(Containers[computer]);
+
+        foreach (var peripheral in computer.Peripherals) 
+            peripheral.Start(this);
+
         _statuses[computer] = ComputerStatus.Running;
     }
 
@@ -151,11 +155,14 @@ public class VagrantBridge
         return "";
     }
 
-
-    public void GetPeripheralStreams(Peripheral peripheral, out StreamReader ingoing, out StreamWriter outgoing)
+    public StreamReader GetPeripheralIngoingStream(Peripheral peripheral)
     {
-        ingoing = VagrantController.GetPeripheralInstream(peripheral.Identificator, peripheral.Parent.Id);
-        outgoing = VagrantController.GetPeripheralOutstream(peripheral.Identificator, peripheral.Parent.Id);
+        return VagrantController.GetPeripheralInstream(peripheral.Identificator, peripheral.Parent.Id);
+    }
+
+    public StreamWriter GetPeripheralOutgoingStream(Peripheral peripheral)
+    {
+        return VagrantController.GetPeripheralOutstream(peripheral.Identificator, peripheral.Parent.Id);
     }
 
     private enum ComputerStatus
@@ -361,17 +368,16 @@ public class VagrantBridge
             _inVagrantExecute($"sudo chmod 777 {InvagrantDevicesFolder}").WaitForExit();
         }
 
-        public static StreamReader GetPeripheralInstream(string deviceId, string computerPath)
+        public static StreamReader GetPeripheralInstream(string peripheralId, string computerId)
         {
-            _inVagrantExecute($"cat {InvagrantDevicesFolder}/{computerPath}/{deviceId}/in", out _, out var stdout,
+            _inVagrantExecute($"cat {InvagrantDevicesFolder}/{computerId}/{peripheralId}/in", out _, out var stdout,
                 out _);
             return stdout;
         }
 
-        public static StreamWriter GetPeripheralOutstream(string deviceId, string computerPath)
+        public static StreamWriter GetPeripheralOutstream(string peripheralId, string computerId)
         {
-            _inVagrantExecute($"cat - > {InvagrantDevicesFolder}/{computerPath}/{deviceId}/out", out var stdin, out _,
-                out _);
+            _inVagrantExecute($"cat - > {InvagrantDevicesFolder}/{computerId}/{peripheralId}/out", out var stdin, out _, out _);
             return stdin;
         }
 
