@@ -23,7 +23,7 @@ public class VagrantBridge
         VagrantController.PreparePeripheralDir(computer.Id);
 
         foreach (var peripheral in computer.Peripherals)
-            VagrantController.PreparePeripherals(computer.Id, peripheral.Identificator);
+            VagrantController.PreparePeripheral(computer.Id, peripheral.Identificator);
 
         VagrantController.DockerImageBuild(computer.Id, out var imageId);
         VagrantController.DockerContainerCreate(computer.Id, imageId, computer.Peripherals.Count > 0,
@@ -347,7 +347,7 @@ public class VagrantBridge
             _inVagrantExecute($"mkdir -p {InvagrantDevicesFolder}/{pcPath}").WaitForExit();
         }
 
-        public static void PreparePeripherals(string pcPath, string id)
+        public static void PreparePeripheral(string pcPath, string id)
         {
             _inVagrantExecute($"mkdir {InvagrantDevicesFolder}/{pcPath}/{id}").WaitForExit();
             _inVagrantExecute($"mkfifo {InvagrantDevicesFolder}/{pcPath}/{id}/in").WaitForExit();
@@ -418,6 +418,8 @@ public class VagrantBridge
                     RedirectStandardError = true
                 }
             };
+            
+            Console.WriteLine($"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments}");
 
             if (forceTTY)
                 sshProcess.StartInfo.Arguments =
@@ -450,6 +452,7 @@ public class VagrantBridge
                 }
             };
 
+            Console.WriteLine($"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments}");
             sshProcess.Start();
 
             return sshProcess;
