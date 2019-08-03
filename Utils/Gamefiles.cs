@@ -24,6 +24,8 @@ public class GameFiles
         }
     }
 
+
+
     private static string _getHomeDirectory()
     {
         return _isUnixPlatform()
@@ -36,4 +38,6 @@ public class GameFiles
         var p = (int) Environment.OSVersion.Platform;
         return p == 4 || p == 6 || p == 128;
     }
+
+
 }

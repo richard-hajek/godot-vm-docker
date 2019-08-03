@@ -55,6 +55,22 @@ public class ComputerContainer : Spatial
         terminalContainer.Open(stdin, stdout);
     }
 
+    public void HotCode(string command)
+    {
+        if (Bridge.DryMode)
+        {
+            GD.PrintErr("Dry Mode active, refusing to execute HotCode.");
+            return;
+        }
+        
+        
+        Bridge.VagrantBridge.AttachToComputer(Computer, out var stdin, out var stdout, out var stderr);
+        stdin.WriteLine(command);
+        stdin.Close();
+        stdout.Close();
+        stderr.Close();
+    }
+
     public IEnumerable<Peripheral> GetPeripherals()
     {
         foreach (var child in GetChildren())

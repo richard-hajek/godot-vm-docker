@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using hackfest2.addons.Utils;
+
 
 public class VagrantBridge
 {
@@ -174,10 +176,10 @@ public class VagrantBridge
 
     private static class VagrantController
     {
-        private const string VirtualMachineImage = "ailispaw/barge";
-        private const string InvagrantComputersMount = "/hackfest";
-        private const string InvagrantDevicesFolder = "/v_dev";
-        private const string IncontainerDevMount = "/dev/per";
+        private const string VIRTUAL_MACHINE_IMAGE = "ailispaw/barge";
+        private const string VAGRANT_COMPUTERS_MOUNT = "/hackfest";
+        private const string VAGRANT_DEVICES_FOLDER = "/v_dev";
+        private const string CONTAINER_DEV_MOUNT = "/dev/per";
 
         private static readonly string WorkingDirectory = Path.Combine(GameFiles.UserDirectoryPath, "map");
 
@@ -221,9 +223,11 @@ public class VagrantBridge
 
         public static void DockerImageBuild(string path, out string imageId)
         {
-            _inVagrantExecute($"cd {InvagrantComputersMount}/{path} && docker build -q ./", out _, out var stdout,
-                out _);
+            _inVagrantExecute($"cd {VAGRANT_COMPUTERS_MOUNT}/{path} && docker build -q ./", out _, out var stdout, out var stderr);
             imageId = stdout.ReadLine();
+            
+            Logger.Log(stdout, "build");
+            Logger.Log(stderr, "build");
         }
 
         public static void DockerContainerCreate(string pcPath, string imageId, bool mountDev, out string containerId)
@@ -233,7 +237,7 @@ public class VagrantBridge
                 _inVagrantExecute($"docker create -it {imageId}", out _, out stdout, out _);
             else
                 _inVagrantExecute(
-                    $"docker create -it -v {InvagrantDevicesFolder}/{pcPath}/:{IncontainerDevMount} {imageId}", out _,
+                    $"docker create -it -v {VAGRANT_DEVICES_FOLDER}/{pcPath}/:{CONTAINER_DEV_MOUNT} {imageId}", out _,
                     out stdout, out _);
             containerId = stdout.ReadLine();
         }
@@ -308,8 +312,8 @@ public class VagrantBridge
         private static string _generateVagrantfile(string computersPath)
         {
             return "Vagrant.configure(\"2\") do |config| \n" +
-                   $"\tconfig.vm.box = \"{VirtualMachineImage}\" \n" +
-                   $"\tconfig.vm.synced_folder \"{computersPath}\", \"{InvagrantComputersMount}\"\n" +
+                   $"\tconfig.vm.box = \"{VIRTUAL_MACHINE_IMAGE}\" \n" +
+                   $"\tconfig.vm.synced_folder \"{computersPath}\", \"{VAGRANT_COMPUTERS_MOUNT}\"\n" +
                    "end\n";
         }
 
@@ -351,40 +355,39 @@ public class VagrantBridge
 
         public static void PreparePeripheralDir(string pcPath)
         {
-            _inVagrantExecute($"mkdir -p {InvagrantDevicesFolder}/{pcPath}").WaitForExit();
+            _inVagrantExecute($"mkdir -p {VAGRANT_DEVICES_FOLDER}/{pcPath}").WaitForExit();
         }
 
         public static void PreparePeripheral(string pcPath, string id)
         {
-            _inVagrantExecute($"mkdir {InvagrantDevicesFolder}/{pcPath}/{id}").WaitForExit();
-            _inVagrantExecute($"mkfifo {InvagrantDevicesFolder}/{pcPath}/{id}/in").WaitForExit();
-            _inVagrantExecute($"mkfifo {InvagrantDevicesFolder}/{pcPath}/{id}/out").WaitForExit();
+            _inVagrantExecute($"mkdir {VAGRANT_DEVICES_FOLDER}/{pcPath}/{id}").WaitForExit();
+            _inVagrantExecute($"mkfifo {VAGRANT_DEVICES_FOLDER}/{pcPath}/{id}/in").WaitForExit();
+            _inVagrantExecute($"mkfifo {VAGRANT_DEVICES_FOLDER}/{pcPath}/{id}/out").WaitForExit();
         }
 
         public static void DevPrepare()
         {
-            _inVagrantExecute($"sudo rm -r {InvagrantDevicesFolder}").WaitForExit();
-            _inVagrantExecute($"sudo mkdir {InvagrantDevicesFolder}").WaitForExit();
-            _inVagrantExecute($"sudo chmod 777 {InvagrantDevicesFolder}").WaitForExit();
+            _inVagrantExecute($"sudo rm -r {VAGRANT_DEVICES_FOLDER}").WaitForExit();
+            _inVagrantExecute($"sudo mkdir {VAGRANT_DEVICES_FOLDER}").WaitForExit();
+            _inVagrantExecute($"sudo chmod 777 {VAGRANT_DEVICES_FOLDER}").WaitForExit();
         }
 
         public static StreamReader GetPeripheralInstream(string peripheralId, string computerId)
         {
-            _inVagrantExecute($"cat {InvagrantDevicesFolder}/{computerId}/{peripheralId}/in", out _, out var stdout,
+            _inVagrantExecute($"cat {VAGRANT_DEVICES_FOLDER}/{computerId}/{peripheralId}/in", out _, out var stdout,
                 out _);
             return stdout;
         }
 
         public static StreamWriter GetPeripheralOutstream(string peripheralId, string computerId)
         {
-            _inVagrantExecute($"cat - > {InvagrantDevicesFolder}/{computerId}/{peripheralId}/out", out var stdin, out _, out _);
+            _inVagrantExecute($"cat - > {VAGRANT_DEVICES_FOLDER}/{computerId}/{peripheralId}/out", out var stdin, out _, out _);
             return stdin;
         }
 
         public static string GetContainerIP(string containerId, string networkId)
         {
-            _inVagrantExecute($"docker inspect -f '{{.NetworkSettings.Networks.{networkId}.IPAddress}}' {containerId}",
-                out _, out var stdout, out _);
+            _inVagrantExecute($"docker inspect -f '{{.NetworkSettings.Networks.{networkId}.IPAddress}}' {containerId}",  out _, out var stdout, out _);
             return stdout.ReadLine();
         }
 
@@ -403,12 +406,12 @@ public class VagrantBridge
                 }
             };
             myProcess.Start();
+            Logger.WriteLine($"Executing: {myProcess.StartInfo.FileName} {myProcess.StartInfo.Arguments} with PID {myProcess.Id}");
 
             if (wait) myProcess.WaitForExit();
         }
 
-        private static Process _inVagrantExecute(string command, out StreamWriter stdin, out StreamReader stdout,
-            out StreamReader stderr, bool forceTTY = false)
+        private static Process _inVagrantExecute(string command, out StreamWriter stdin, out StreamReader stdout, out StreamReader stderr, bool forceTTY = false)
         {
             var sshProcess = new Process
             {
@@ -424,18 +427,14 @@ public class VagrantBridge
                     RedirectStandardError = true
                 }
             };
-            
-            Console.WriteLine($"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments}");
 
             if (forceTTY)
-                sshProcess.StartInfo.Arguments =
-                    $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key -tt \"{command}\"";
+                sshProcess.StartInfo.Arguments = $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key -tt \"{command}\"";
             else
-                sshProcess.StartInfo.Arguments =
-                    $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"";
+                sshProcess.StartInfo.Arguments = $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"";
 
-            Console.WriteLine($"[Executing] {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments}");
             sshProcess.Start();
+            Logger.WriteLine($"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments} with PID {sshProcess.Id}");
 
             stdout = sshProcess.StandardOutput;
             stdin = sshProcess.StandardInput;
@@ -452,14 +451,17 @@ public class VagrantBridge
                 {
                     UseShellExecute = false,
                     FileName = "ssh",
-                    Arguments =
-                        $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"",
+                    Arguments = $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"",
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
                     WorkingDirectory = GetVagrantPath()
                 }
             };
 
-            Console.WriteLine($"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments}");
             sshProcess.Start();
+            Logger.WriteLine($"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments} with PID {sshProcess.Id}");
+            Logger.Log(sshProcess.StandardError, $"{sshProcess.Id}");
+            Logger.Log(sshProcess.StandardOutput, $"{sshProcess.Id}");
 
             return sshProcess;
         }

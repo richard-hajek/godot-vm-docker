@@ -51,6 +51,11 @@ public class Terminal
     
     public void Open(StreamWriter stdin, StreamReader stdout)
     {
+        Lines.Clear();
+        Lines.Add(new Line {Columns = new Glyph[_termSizeX]});
+        _cursorX = 0;
+        _cursorY = 0;
+        
         _stdin = stdin;
         _stdout = stdout;
 
