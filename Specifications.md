@@ -57,10 +57,4 @@ Terminal should support enough ANSI escape sequences to make vim work.
 
 ## Godot oriented classes
 
-### BridgeWrapper
-
-Should provide an instance of DockerBridge.
-Should start and shutdown DockerBridge.
-
-### ComputerContainer
-
+WIP
