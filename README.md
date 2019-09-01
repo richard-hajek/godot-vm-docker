@@ -29,19 +29,21 @@ you can use add this repo as submodule.
 
 - Execute `git submodule add git@github.com:meowxiik/godot-vm-docker.git addons/godot-vm-docker` in the project root
 
-
 ## Usage
 
 1. Enable plugin in Project -> Project Settings -> Plugins
-2. Add node `VM Bridge Manager` under the root of your project. It *MUST* be directly beneath the project root node.
-3. Add node `Computer`
-4. Open the `Computer` node in inspector, set a Dockerfile, for example:
+2. Add node `Computer`
+3. Open the `Computer` node in inspector, set a Dockerfile, for example:
  ```
  FROM busybox
  CMD sh
  ```
-5. Add control `Terminal`
-6. When you want to open a terminal for a computer execute `terminalNode.Open(computerNode)`
+4. Add control `Terminal`
+5. When you want to open a terminal for a computer execute `terminalNode.Open(computerNode)`
+
+## Specification
+
+See Specifications.md detailed description of relevant classes.
 
 ## Troubleshooting
 
@@ -63,17 +65,14 @@ And replace any `<Compile Include="addons\godot-virtual-machines\<anything>.cs">
 with just `<Compile Include="addons\**\*.cs"/>`
 
 ### Scene takes forever to load!
-The `VM Bridge Manager` node needs to complete the boot process of the VM, to make sure all simulated computers have the docker daemon available.
-I suggest you prepare a loading scene for now.
-
-I do plan on preparing an EarlyBoot() static call though, which would make it possible to preboot the VM.
+The computer nodes need to complete their boot processes.
+If you wish you can call `BridgeWrapper.PreStart()` which will preboot the VM.
 
 ### The VM stays running even after the game was killed!
-This is a known issue, for which I apologize and will fix before reaching stable version.
 VM shutdown relies on Godot's _OnTreeExit(), so if the game is abruptly killed, the VM stays running.
-You can manually kill it by killing VirtualBox's process in process explorer.
-Since the plugin has no use for the machine after it quits and will reset it on next boot anyway, any damage done to it is irrelevant.
+You can manually kill it by killing VirtualBox's process in process explorer
+Any damage done to the machine is irrelevant, it will get fixed on next boot.
 
 ### Terminal emulator behaves weirdly!
-Terminal is highly WIP currently, as best described by `unsupported = true` on every two lines in `Terminal.cs`.
+Terminal is highly WIP currently, as best described by `unsupported = true` on every literally two lines in `Terminal.cs`.
 But please do report any bugs!

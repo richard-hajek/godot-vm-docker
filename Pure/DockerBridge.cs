@@ -2,176 +2,195 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using hackfest2.addons.Utils;
 
-
-public class VagrantBridge
+public enum Errors
 {
-    private readonly Dictionary<Tuple<Computer, Computer>, string> _networks =
-        new Dictionary<Tuple<Computer, Computer>, string>();
+    OK,
+    NoSuchContainer,
+    NotConnected,
+    AlreadyConnected,
+    AlreadySnooping,
+    NoSuchPeripheral,
+    ImageBuildError
+}
 
-    private readonly Dictionary<Computer, ComputerStatus> _statuses = new Dictionary<Computer, ComputerStatus>();
-    public readonly Dictionary<Computer, string> Containers = new Dictionary<Computer, string>();
+public class DockerBridge
+{
+    private readonly Dictionary<string, string> _containersIds = new Dictionary<string, string>();
+
+    private readonly Dictionary<Tuple<string, string>, string> _networks =
+        new Dictionary<Tuple<string, string>, string>();
 
     public void Begin()
     {
         VagrantController.VagrantPrepare();
     }
 
-    public void PrepareComputer(Computer computer)
+    public int CreateContainer(string customId, string dockerfile, IList<string> peripheralIds)
     {
-        VagrantController.PrepareComputerDir(computer.Id, computer.Dockerfile);
-        VagrantController.PreparePeripheralDir(computer.Id);
+        VagrantController.PrepareComputerDir(customId, dockerfile);
+        VagrantController.PreparePeripheralDir(customId);
 
-        foreach (var peripheral in computer.Peripherals)
-            VagrantController.PreparePeripheral(computer.Id, peripheral.Identificator);
+        foreach (var peripheral in peripheralIds)
+            VagrantController.PreparePeripheral(customId, peripheral);
 
-        VagrantController.DockerImageBuild(computer.Id, out var imageId);
-        VagrantController.DockerContainerCreate(computer.Id, imageId, computer.Peripherals.Count > 0,
-            out var containerId);
+        VagrantController.DockerImageBuild(customId, out var imageId);
 
-        Containers.Add(computer, containerId);
-        _statuses.Add(computer, ComputerStatus.Prepared);
+        if (string.IsNullOrEmpty(imageId))
+            return (int) Errors.ImageBuildError;
+
+        VagrantController.DockerContainerCreate(customId, imageId, peripheralIds.Count > 0, out var containerId);
+
+        _containersIds.Add(customId, containerId);
+
+        return (int) Errors.OK;
     }
 
-    public void StartComputer(Computer computer)
+    public int StartContainer(string customId)
     {
-        VagrantController.DockerContainerStart(Containers[computer]);
+        if (!_containersIds.ContainsKey(customId)) return (int) Errors.NoSuchContainer;
 
-        foreach (var peripheral in computer.Peripherals) 
-            peripheral.Start(this);
+        VagrantController.DockerContainerStart(_containersIds[customId]);
 
-        _statuses[computer] = ComputerStatus.Running;
+        return (int) Errors.OK;
     }
 
-    public void AttachToComputer(Computer computer, out StreamWriter stdin, out StreamReader stdout,
-        out StreamReader stderr, bool forceSTY = false)
+    public int CreateTTY(string customId, out StreamWriter stdin, out StreamReader stdout, bool forceSTY = false)
     {
-        _statuses[computer] = ComputerStatus.Connected;
-        VagrantController.DockerContainerAttach(Containers[computer], out stdin, out stdout, out stderr, forceSTY);
-    }
-
-    public void DisconnectComputer(Computer computer)
-    {
-        _statuses[computer] = ComputerStatus.Running;
-    }
-
-    public void StopComputer(Computer computer)
-    {
-        _statuses[computer] = ComputerStatus.Prepared;
-        VagrantController.DockerContainerStop(Containers[computer]);
-    }
-
-    public void DeleteComputer(Computer computer)
-    {
-        VagrantController.DockerContainerRemove(Containers[computer]);
-        _statuses.Remove(computer);
-    }
-
-    public void Stop()
-    {
-        var pcs = _statuses.Keys.ToList();
-        foreach (var pc in pcs)
+        if (!_containersIds.ContainsKey(customId))
         {
-            if (_statuses[pc] == ComputerStatus.Connected)
-                DisconnectComputer(pc);
+            stdout = null;
+            stdin = null;
+            return (int) Errors.NoSuchContainer;
+        }
 
-            if (_statuses[pc] == ComputerStatus.Running)
-                StopComputer(pc);
+        VagrantController.DockerContainerAttach(_containersIds[customId], out stdin, out stdout, out var stderr, forceSTY);
+        //Logger.Log(stderr, "[AttachErr]"); This freezes the thing for some reason
 
-            DeleteComputer(pc);
+        return (int) Errors.OK;
+    }
+
+    public int StopContainer(string customId)
+    {
+        if (!_containersIds.ContainsKey(customId)) return (int) Errors.NoSuchContainer;
+
+        VagrantController.DockerContainerStop(_containersIds[customId]);
+
+        return (int) Errors.OK;
+    }
+
+    public int DeleteContainer(string customId)
+    {
+        if (!_containersIds.ContainsKey(customId)) return (int) Errors.NoSuchContainer;
+
+        VagrantController.DockerContainerRemove(_containersIds[customId]);
+
+        return (int) Errors.OK;
+    }
+
+    public int Stop()
+    {
+        foreach (var pair in _containersIds)
+        {
+            var containerId = pair.Value;
+            StopContainer(containerId);
+            DeleteContainer(containerId);
         }
 
         VagrantController.VagrantStop();
+
+        return (int) Errors.OK;
     }
 
-    public void ConnectComputers(Computer a, Computer b)
+    public int Connect(string containerIdA, string containerIdB)
     {
-        var tuple = new Tuple<Computer, Computer>(a, b);
-        var netname = Convert.ToBase64String(new Guid().ToByteArray());
-        _networks.Add(tuple, netname);
+        if (!_containersIds.ContainsKey(containerIdA) || !_containersIds.ContainsKey(containerIdB))
+            return (int) Errors.NoSuchContainer;
 
-        Console.WriteLine("Network named " + netname);
-        VagrantController.DockerNetworkCreate(netname);
-        VagrantController.DockerNetworkConnect(Containers[a], netname);
-        VagrantController.DockerNetworkConnect(Containers[b], netname);
+        var tuple = _determinableTuple(containerIdA, containerIdB);
+        if (_networks.ContainsKey(tuple)) return (int) Errors.AlreadyConnected;
+
+        var netName = Convert.ToBase64String(new Guid().ToByteArray());
+        _networks.Add(tuple, netName);
+
+        VagrantController.DockerNetworkCreate(netName);
+        VagrantController.DockerNetworkConnect(_containersIds[containerIdA], netName);
+        VagrantController.DockerNetworkConnect(_containersIds[containerIdB], netName);
+
+        return (int) Errors.OK;
     }
 
-    public void DisconnectComputers(Computer a, Computer b)
+    public int Disconnect(string containerIdA, string containerIdB)
     {
-        var tuple = new Tuple<Computer, Computer>(a, b);
-        var tupleRev = new Tuple<Computer, Computer>(b, a);
+        var tuple = _determinableTuple(containerIdA, containerIdB);
 
-        var netname = _networks.ContainsKey(tuple) ? _networks[tuple] : _networks[tupleRev];
+        if (!_networks.ContainsKey(tuple)) return (int) Errors.NotConnected;
 
-        VagrantController.DockerNetworkDisconnect(Containers[a], netname);
-        VagrantController.DockerNetworkDisconnect(Containers[b], netname);
+        var netname = _networks[tuple];
+
+        VagrantController.DockerNetworkDisconnect(_containersIds[containerIdA], netname);
+        VagrantController.DockerNetworkDisconnect(_containersIds[containerIdB], netname);
         VagrantController.DockerNetworkRemove(netname);
+        return (int) Errors.OK;
     }
-
-    public void EavesdropOn(Computer a, Computer b, Computer eavesdropping)
+    public int SnoopOn(string containerIdA, string containerIdB, string containerSnooping)
     {
-        var tuple = new Tuple<Computer, Computer>(a, b);
-        var tupleRev = new Tuple<Computer, Computer>(b, a);
-        var netname = _networks.ContainsKey(tuple) ? _networks[tuple] : _networks[tupleRev];
+        var tuple = _determinableTuple(containerIdA, containerIdB);
 
-        VagrantController.DockerNetworkConnect(Containers[eavesdropping], netname);
-        var ipa = VagrantController.GetContainerIP(Containers[a], netname);
-        var ipb = VagrantController.GetContainerIP(Containers[b], netname);
-        var ipAttacker = VagrantController.GetContainerIP(Containers[eavesdropping], netname);
-        VagrantController.IptablesEavesdropOn(ipa, ipb, ipAttacker);
-    }
-
-    public void StopEavesdroppingOn(Computer a, Computer b, Computer eavesdropping)
-    {
-        var tuple = new Tuple<Computer, Computer>(a, b);
-        var tupleRev = new Tuple<Computer, Computer>(b, a);
-        var netname = _networks.ContainsKey(tuple) ? _networks[tuple] : _networks[tupleRev];
-
-        VagrantController.DockerNetworkDisconnect(Containers[eavesdropping], netname);
-        var ipa = VagrantController.GetContainerIP(Containers[a], netname);
-        var ipb = VagrantController.GetContainerIP(Containers[b], netname);
-        var ipAttacker = VagrantController.GetContainerIP(Containers[eavesdropping], netname);
-        VagrantController.IptablesRemoveEavesdropping(ipa, ipb, ipAttacker);
-    }
-
-    public string GetComputerIP(Computer c)
-    {
-        var network = "";
-
-        foreach (var pair in _networks)
+        if (!_networks.ContainsKey(tuple))
         {
-            var pc1 = pair.Key.Item1;
-            var pc2 = pair.Key.Item2;
-            var net = pair.Value;
-
-            if (pc1 == c) network = net;
-
-            if (pc2 == c) network = net;
+            return (int) Errors.NotConnected;
         }
 
-        if (network != "")
-            return VagrantController.GetContainerIP(Containers[c], network);
+        var netName = _networks[tuple];
 
-        return "";
+        VagrantController.DockerNetworkConnect(_containersIds[containerSnooping], netName);
+        var ipa = VagrantController.GetContainerIP(_containersIds[containerIdA], netName);
+        var ipb = VagrantController.GetContainerIP(_containersIds[containerIdB], netName);
+        var ipAttacker = VagrantController.GetContainerIP(_containersIds[containerSnooping], netName);
+        VagrantController.IptablesEavesdropOn(ipa, ipb, ipAttacker);
+        return (int) Errors.OK;
     }
 
-    public StreamReader GetPeripheralIngoingStream(Peripheral peripheral)
+    public int StopSnoopOn(string containerIdA, string containerIdB, string containerSnooping)
     {
-        return VagrantController.GetPeripheralInstream(peripheral.Identificator, peripheral.Parent.Id);
+        var tuple = _determinableTuple(containerIdA, containerIdB);
+
+        if (!_networks.ContainsKey(tuple)) return (int) Errors.NotConnected;
+
+        var netName = _networks[tuple];
+
+        VagrantController.DockerNetworkDisconnect(_containersIds[containerSnooping], netName);
+        var ipa = VagrantController.GetContainerIP(_containersIds[containerIdA], netName);
+        var ipb = VagrantController.GetContainerIP(_containersIds[containerIdB], netName);
+        var ipAttacker = VagrantController.GetContainerIP(_containersIds[containerSnooping], netName);
+        VagrantController.IptablesRemoveEavesdropping(ipa, ipb, ipAttacker);
+        return (int) Errors.OK;
+    }
+    
+    private Tuple<string, string> _determinableTuple(string strA, string strB)
+    {
+        switch (string.CompareOrdinal(strA, strB))
+        {
+            case 1:
+            case 0:
+                return new Tuple<string, string>(strA, strB);
+            case -1:
+                return new Tuple<string, string>(strB, strA);
+        }
+
+        throw new Exception();
     }
 
-    public StreamWriter GetPeripheralOutgoingStream(Peripheral peripheral)
+    
+    public StreamReader GetPeripheralIngoingStream(string containerId, string peripheralId)
     {
-        return VagrantController.GetPeripheralOutstream(peripheral.Identificator, peripheral.Parent.Id);
+        return VagrantController.GetPeripheralInstream(peripheralId, containerId);
     }
 
-    private enum ComputerStatus
+    public StreamWriter GetPeripheralOutgoingStream(string containerId, string peripheralId)
     {
-        Prepared,
-        Running,
-        Connected
+        return VagrantController.GetPeripheralOutstream(peripheralId, containerId);
     }
 
     private static class VagrantController
@@ -223,9 +242,10 @@ public class VagrantBridge
 
         public static void DockerImageBuild(string path, out string imageId)
         {
-            _inVagrantExecute($"cd {VAGRANT_COMPUTERS_MOUNT}/{path} && docker build -q ./", out _, out var stdout, out var stderr);
+            _inVagrantExecute($"cd {VAGRANT_COMPUTERS_MOUNT}/{path} && docker build -q ./", out _, out var stdout,
+                out var stderr);
             imageId = stdout.ReadLine();
-            
+
             Logger.Log(stdout, "build");
             Logger.Log(stderr, "build");
         }
@@ -349,10 +369,6 @@ public class VagrantBridge
             _inVagrantExecute($"sudo iptables -D FORWARD -s {ip2} -j TEE --gateway {eavesdroppingIP}").WaitForExit();
         }
 
-        public static void IptablesWipe()
-        {
-        }
-
         public static void PreparePeripheralDir(string pcPath)
         {
             _inVagrantExecute($"mkdir -p {VAGRANT_DEVICES_FOLDER}/{pcPath}").WaitForExit();
@@ -372,22 +388,24 @@ public class VagrantBridge
             _inVagrantExecute($"sudo chmod 777 {VAGRANT_DEVICES_FOLDER}").WaitForExit();
         }
 
-        public static StreamReader GetPeripheralInstream(string peripheralId, string computerId)
+        public static StreamReader GetPeripheralInstream(string peripheralId, string customId)
         {
-            _inVagrantExecute($"cat {VAGRANT_DEVICES_FOLDER}/{computerId}/{peripheralId}/in", out _, out var stdout,
+            _inVagrantExecute($"cat {VAGRANT_DEVICES_FOLDER}/{customId}/{peripheralId}/in", out _, out var stdout,
                 out _);
             return stdout;
         }
 
-        public static StreamWriter GetPeripheralOutstream(string peripheralId, string computerId)
+        public static StreamWriter GetPeripheralOutstream(string peripheralId, string customId)
         {
-            _inVagrantExecute($"cat - > {VAGRANT_DEVICES_FOLDER}/{computerId}/{peripheralId}/out", out var stdin, out _, out _);
+            _inVagrantExecute($"cat - > {VAGRANT_DEVICES_FOLDER}/{customId}/{peripheralId}/out", out var stdin, out _,
+                out _);
             return stdin;
         }
 
         public static string GetContainerIP(string containerId, string networkId)
         {
-            _inVagrantExecute($"docker inspect -f '{{.NetworkSettings.Networks.{networkId}.IPAddress}}' {containerId}",  out _, out var stdout, out _);
+            _inVagrantExecute($"docker inspect -f '{{.NetworkSettings.Networks.{networkId}.IPAddress}}' {containerId}",
+                out _, out var stdout, out _);
             return stdout.ReadLine();
         }
 
@@ -406,12 +424,14 @@ public class VagrantBridge
                 }
             };
             myProcess.Start();
-            Logger.WriteLine($"Executing: {myProcess.StartInfo.FileName} {myProcess.StartInfo.Arguments} with PID {myProcess.Id}");
+            Logger.WriteLine(
+                $"Executing: {myProcess.StartInfo.FileName} {myProcess.StartInfo.Arguments} with PID {myProcess.Id}");
 
             if (wait) myProcess.WaitForExit();
         }
 
-        private static Process _inVagrantExecute(string command, out StreamWriter stdin, out StreamReader stdout, out StreamReader stderr, bool forceTTY = false)
+        private static Process _inVagrantExecute(string command, out StreamWriter stdin, out StreamReader stdout,
+            out StreamReader stderr, bool forceTTY = false)
         {
             var sshProcess = new Process
             {
@@ -429,12 +449,15 @@ public class VagrantBridge
             };
 
             if (forceTTY)
-                sshProcess.StartInfo.Arguments = $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key -tt \"{command}\"";
+                sshProcess.StartInfo.Arguments =
+                    $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key -tt \"{command}\"";
             else
-                sshProcess.StartInfo.Arguments = $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"";
+                sshProcess.StartInfo.Arguments =
+                    $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"";
 
             sshProcess.Start();
-            Logger.WriteLine($"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments} with PID {sshProcess.Id}");
+            Logger.WriteLine(
+                $"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments} with PID {sshProcess.Id}");
 
             stdout = sshProcess.StandardOutput;
             stdin = sshProcess.StandardInput;
@@ -451,7 +474,8 @@ public class VagrantBridge
                 {
                     UseShellExecute = false,
                     FileName = "ssh",
-                    Arguments = $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"",
+                    Arguments =
+                        $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"",
                     RedirectStandardError = true,
                     RedirectStandardOutput = true,
                     WorkingDirectory = GetVagrantPath()
@@ -459,7 +483,8 @@ public class VagrantBridge
             };
 
             sshProcess.Start();
-            Logger.WriteLine($"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments} with PID {sshProcess.Id}");
+            Logger.WriteLine(
+                $"Executing: {sshProcess.StartInfo.FileName} {sshProcess.StartInfo.Arguments} with PID {sshProcess.Id}");
             Logger.Log(sshProcess.StandardError, $"{sshProcess.Id}");
             Logger.Log(sshProcess.StandardOutput, $"{sshProcess.Id}");
 

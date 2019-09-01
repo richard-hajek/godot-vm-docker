@@ -4,75 +4,83 @@ using System.IO;
 using Godot;
 using Thread = System.Threading.Thread;
 
-[Tool]
 public class Terminal
 {
+    public delegate void ScreenUpdatedDelegate();
 
     public static Color DefaultBackground = Colors.Black;
     public static Color DefaultForeground = Colors.White;
-    
+    private readonly List<int> _escapeArguments = new List<int>();
+
+    private readonly int _termSizeX;
+    private readonly int _termSizeY;
+
+    private readonly Dictionary<int, Color> bit16Colors = new Dictionary<int, Color>
+    {
+        {0, Colors.Black},
+        {1, Colors.Red},
+        {2, Colors.Green},
+        {3, Colors.Brown},
+        {4, Colors.Blue},
+        {5, Colors.Magenta},
+        {6, Colors.Cyan},
+        {7, Colors.White}
+    };
+
+    private string _argumentInWriting = "";
+
     private int _currentAttributes;
     private Color _currentBackground = DefaultBackground;
     private Color _currentForeground = DefaultForeground;
 
     private int _cursorX;
     private int _cursorY;
+    private string _escapeSequence = "";
+
+    private EscapeStates _escapeState = EscapeStates.NoEscape;
 
     private StreamWriter _stdin;
     private StreamReader _stdout;
 
-    private readonly int _termSizeX;
-    private readonly int _termSizeY;
-
-    public Font Font;
-
     public List<Line> Lines = new List<Line>();
 
-    public Node Parent;
+    public Terminal(int termSizeX, int termSizeY)
+    {
+        _termSizeX = termSizeX;
+        _termSizeY = termSizeY;
+    }
 
     public event ScreenUpdatedDelegate ScreenUpdated;
 
-    public Terminal(Font font, Vector2 termSize)
-    {
-        Font = font;
-        _termSizeX =  (int) (termSize.x / FontSizeX);
-        _termSizeY = (int) (termSize.y / FontSizeY);
-
-        Lines.Add(new Line {Columns = new Glyph[_termSizeX]});
-    }
-
-    public float FontSizeX => Font.GetStringSize("X").x;
-    public float FontSizeY => Font.GetStringSize("X").y;
-
-    private EscapeStates _escapeState = EscapeStates.NoEscape;
-    private List<int> _escapeArguments = new List<int>();
-    private string _argumentInWriting = "";
-    private string _escapeSequence = "";
-    
     public void Open(StreamWriter stdin, StreamReader stdout)
     {
-        Lines.Clear();
-        Lines.Add(new Line {Columns = new Glyph[_termSizeX]});
+        _regenerateLines();
         _cursorX = 0;
         _cursorY = 0;
-        
+
         _stdin = stdin;
         _stdout = stdout;
 
-        var thread = new Thread(streamRead);
-        thread.Start(stdout);
+        var thread = new Thread(StreamRead);
+        thread.Start();
+    }
+
+    private void _regenerateLines()
+    {
+        Lines.Clear();
+
+        for (var y = 0; y < _termSizeY; y++) Lines.Add(new Line {Columns = new Glyph[_termSizeX]});
     }
 
     public void Close()
     {
     }
 
-    private void streamRead(object o)
+    private void StreamRead()
     {
-        var reader = (StreamReader) o;
-        while (reader != null && !reader.EndOfStream)
+        while (_stdout != null && !_stdout.EndOfStream)
         {
-            var c = reader.Read();
+            var c = _stdout.Read();
             OnOutput((char) c);
         }
     }
@@ -84,7 +92,7 @@ public class Terminal
             ScreenUpdated?.Invoke();
             return;
         }
-    
+
         if (!ASCII.IsPrintable(c))
         {
             switch (c)
@@ -119,9 +127,9 @@ public class Terminal
 
         ScreenUpdated?.Invoke();
     }
-    
+
     /// <summary>
-    /// Processes the next character, inspecting for CSI sequences
+    ///     Processes the next character, inspecting for CSI sequences
     /// </summary>
     /// <param name="c">Next character</param>
     /// <returns>True if the character was consumed</returns>
@@ -153,10 +161,11 @@ public class Terminal
                     _escapeState = EscapeStates.NoEscape;
                     return true;
                 }
+
             case EscapeStates.CSISequence:
 
                 _escapeSequence += c;
-                
+
                 if (int.TryParse(c + "", out _))
                 {
                     _argumentInWriting += c;
@@ -164,52 +173,49 @@ public class Terminal
                 }
                 else if (c == ';')
                 {
-
                     if (_argumentInWriting.Length != 0)
                     {
                         _escapeArguments.Add(int.Parse(_argumentInWriting));
                         _argumentInWriting = "";
                     }
-                    
+
                     return true;
                 }
                 else
                 {
-                    
                     if (_argumentInWriting.Length != 0)
                     {
                         _escapeArguments.Add(int.Parse(_argumentInWriting));
                         _argumentInWriting = "";
                     }
-                    
-                    _executeCSI( c, _escapeArguments);
-                    
+
+                    _executeCSI(c, _escapeArguments);
+
                     _escapeArguments.Clear();
                     _escapeSequence = "";
-                    
+
                     _escapeState = EscapeStates.NoEscape;
                     return true;
                 }
+
             default:
                 throw new ArgumentOutOfRangeException();
         }
-        
     }
 
     private void _executeEscNonCSI(char command)
     {
         var unsupported = false;
-        
+
         switch (command)
         {
             case 'c': // Reset
                 _cursorX = 0;
                 _cursorY = 0;
+                _regenerateLines();
                 _currentAttributes = 0;
                 _currentBackground = DefaultBackground;
                 _currentForeground = DefaultForeground;
-                Lines.Clear();
-                Lines.Add(new Line {Columns = new Glyph[_termSizeX]});
                 break;
             case 'D': // Linefeed
                 _cursorMove(0, 1, false, true);
@@ -251,27 +257,16 @@ public class Terminal
                 GD.Print($"Esc Execute encountered an unknown ESC sequence: '{_escapeSequence}'");
                 break;
         }
-        
+
         if (unsupported)
             GD.Print($"Esc Executer encountered a unsupported sequence: '{_escapeSequence}'");
     }
-    private readonly Dictionary<int, Color> bit16Colors = new Dictionary<int, Color>
-    {
-        {0, Colors.Black},
-        {1, Colors.Red},
-        {2, Colors.Green},
-        {3, Colors.Brown},
-        {4, Colors.Blue},
-        {5, Colors.Magenta},
-        {6, Colors.Cyan},
-        {7, Colors.White}
-    };
+
     private void _executeCSI(char command, List<int> arguments)
     {
-
         var unsupported = false;
         var badSyntax = false;
-        
+
         var argsNum = arguments.Count;
 
         switch (command)
@@ -284,7 +279,7 @@ public class Terminal
                 }
 
                 var blanks = arguments[0];
-                _cursorMove( blanks, 0, true, true);
+                _cursorMove(blanks, 0, true, true);
                 break;
             case 'A': // Move the cursor up # of rows
 
@@ -293,81 +288,81 @@ public class Terminal
                     badSyntax = true;
                     break;
                 }
-                
+
                 var rows = arguments[0];
                 _cursorMove(0, -rows, false, true);
-            
+
                 break;
             case 'B': // Move the cursor down # of rows
-                
-                
+
+
                 if (argsNum != 1)
                 {
                     badSyntax = true;
                     break;
                 }
-                
+
                 rows = arguments[0];
                 _cursorMove(0, rows, false, true);
-                
+
                 break;
             case 'C': // Move the cursor right # of columns
-                
+
                 if (argsNum != 1)
                 {
                     badSyntax = true;
                     break;
                 }
-                
+
                 var columns = arguments[0];
-                _cursorMove (columns, 0, false, true);
-                
+                _cursorMove(columns, 0, false, true);
+
                 break;
             case 'D': // Move the cursor left # of columns
-                
+
                 if (argsNum != 1)
                 {
                     badSyntax = true;
                     break;
                 }
-                
+
                 columns = arguments[0];
-                _cursorMove( -columns, 0, false, true);
-                
+                _cursorMove(-columns, 0, false, true);
+
                 break;
             case 'E': // Move the cursor down # of rows, to column 1
-                
+
                 if (argsNum != 1)
                 {
                     badSyntax = true;
                     break;
                 }
-                
+
                 rows = arguments[0];
                 _cursorMove(0, rows, false, true);
                 _cursorX = 0;
-                
+
                 break;
             case 'F': // Move the cursor up # of rows, to column 1
-                
+
                 if (argsNum != 1)
                 {
                     badSyntax = true;
                     break;
                 }
-                
+
                 rows = arguments[0];
-                _cursorMove(0,  -rows, false, true);
+                _cursorMove(0, -rows, false, true);
                 _cursorX = 0;
                 break;
             case 'G': // Move to the indicated column in the current row
-                
+
                 if (argsNum != 1)
                 {
                     badSyntax = true;
                     break;
                 }
-                
+
                 var column = arguments[0];
                 _cursorX = column;
                 break;
@@ -392,7 +387,7 @@ public class Terminal
 
                 _cursorY = row;
                 _cursorX = column;
-                
+
                 break;
             case 'J': // Erase display
 
@@ -415,31 +410,29 @@ public class Terminal
                 switch (mode)
                 {
                     case 0: // From cursor to end
-                        if (_cursorY + 1 < Lines.Count)
-                        {
-                            Lines.RemoveRange(_cursorY + 1, Lines.Count - _cursorY - 1);
-                        }
 
                         for (var x = _cursorX; x < _termSizeX; x++)
-                        {
                             Lines[_cursorY].Columns[x] = new Glyph();
-                        }
+
+                        for (var y = _cursorY + 1; y < _termSizeY; y++)
+                            Lines[y] = new Line {Columns = new Glyph[_termSizeX]};
+
                         break;
                     case 1: // From start to cursor
                         unsupported = true;
                         break;
                     case 2: // Whole display
                     case 3: // Whole display, including scroll back
-                        Lines.Clear();
-                        Lines.Add(new Line {Columns = new Glyph[_termSizeX]});
+                        _regenerateLines();
                         break;
                     default:
                         badSyntax = true;
                         break;
                 }
+
                 break;
             case 'K': // Erase line
-                
+
                 if (argsNum == 0)
                 {
                     mode = 0;
@@ -457,19 +450,28 @@ public class Terminal
                 switch (mode)
                 {
                     case 0: // From cursor to end
-                        unsupported = true;
+
+                        for (var x = _cursorX; x < _termSizeX; x++)
+                            Lines[_cursorY].Columns[x] = new Glyph();
+
                         break;
                     case 1: // From start to cursor
-                        unsupported = true;
+
+                        for (var x = 0; x <= _cursorX; x++)
+                            Lines[_cursorY].Columns[x] = new Glyph();
+
                         break;
                     case 2: // Whole line
-                        Lines[_cursorY] = new Line{Columns = new Glyph[_termSizeX]};
+
+                        for (var x = 0; x < _termSizeX; x++)
+                            Lines[_cursorY].Columns[x] = new Glyph();
+
                         break;
                     default:
                         badSyntax = true;
                         break;
                 }
-                
+
                 break;
             case 'L': // Insert # of blank lines
                 unsupported = true;
@@ -516,10 +518,8 @@ public class Terminal
                     _currentAttributes = 0;
                     break;
                 }
-                        
+
                 foreach (var arg in arguments)
-                {
-                    
                     if (30 <= arg && arg <= 37)
                     {
                         var n = arg - 30;
@@ -531,25 +531,30 @@ public class Terminal
                         var n = arg - 40;
                         var color = bit16Colors[n];
                         _currentBackground = color;
-                    } else switch (arg)
-                    {
-                        case 0:
-                            _currentBackground = DefaultBackground;
-                            _currentForeground = DefaultForeground;
-                            _currentAttributes = 0;
-                            break;
-                        case 38:
-                        case 39:
-                            _currentForeground = DefaultForeground;
-                            break;
-                        case 49:
-                            _currentBackground = DefaultBackground;
-                            break;
-                        default: // Assume that we are not supporting color, instead of assuming that it doens't exist
-                            GD.Print($"Unknown graphics mode: {arg}");
-                            break;
                     }
-                }
+                    else
+                    {
+                        switch (arg)
+                        {
+                            case 0:
+                                _currentBackground = DefaultBackground;
+                                _currentForeground = DefaultForeground;
+                                _currentAttributes = 0;
+                                break;
+                            case 38:
+                            case 39:
+                                _currentForeground = DefaultForeground;
+                                break;
+                            case 49:
+                                _currentBackground = DefaultBackground;
+                                break;
+                            default
+                                : // Assume that we are not supporting color, instead of assuming that it doens't exist
+                                GD.Print($"Unknown graphics mode: {arg}");
+                                break;
+                        }
+                    }
+
                 break;
             case 'n': // Status report
                 unsupported = true;
@@ -573,10 +578,10 @@ public class Terminal
                 GD.Print($"CSI Execute encountered an unknown sequence: '{_escapeSequence}'");
                 break;
         }
-        
+
         if (unsupported)
             GD.Print($"CSI Executer encountered a unsupported sequence: '{_escapeSequence}'");
-        
+
         if (badSyntax)
             GD.Print($"CSI Executer encountered a sequence with bad syntax: '{_escapeSequence}'");
     }
@@ -591,7 +596,7 @@ public class Terminal
         var newX = _cursorX + dx;
         var newY = _cursorY + dy;
 
-        if (newX >= Lines[_cursorY].Columns.Length)
+        if (newX >= _termSizeX)
         {
             if (wrap)
             {
@@ -600,35 +605,23 @@ public class Terminal
             }
             else
             {
-                newX = Lines[_cursorY].Columns.Length - 1;
+                newX = _termSizeX - 1;
             }
         }
 
-        var linesCount = Lines.Count;
-        if (newY >= linesCount)
+        if (newY >= _termSizeY)
         {
-            Lines.Add(new Line {Columns = new Glyph[_termSizeX]});
-            linesCount++;
-
-            if (linesCount > _termSizeY)
+            if (scroll)
             {
-                if (scroll)
-                {
-                    Lines.RemoveAt(0);
-                    linesCount--;
-                }
-                else
-                {
-                    Lines.RemoveAt(linesCount - 1);
-                    linesCount--;
-                }
-
-                newY = linesCount - 1;
+                Lines.RemoveAt(0);
+                Lines.Add(new Line {Columns = new Glyph[_termSizeX]});
             }
+
+            newY = _termSizeY - 1;
         }
 
-        _cursorX =  newX;
-        _cursorY =  newY;
+        _cursorX = newX;
+        _cursorY = newY;
     }
 
     internal struct Glyph
@@ -643,8 +636,6 @@ public class Terminal
     {
         internal Glyph[] Columns;
     }
-
-    public delegate void ScreenUpdatedDelegate();
 
     internal enum EscapeStates
     {
