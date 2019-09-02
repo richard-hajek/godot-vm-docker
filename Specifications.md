@@ -57,4 +57,57 @@ Terminal should support enough ANSI escape sequences to make vim work.
 
 ## Godot oriented classes
 
-WIP
+### Bridge Node
+
+Bridge node shall contain a reference to Docker Bridge,
+it will take care of starting and shutting down the Docker Bridge.
+
+### Container Node
+
+Container node shall check if a Bridge Node exists, if not, 
+it will create one and attach it to the tree.
+
+Container node shall export the following variables:
+ID, Dockerfile, Peripherals
+
+Container nodes shall always have a custom ID,
+if user does not provide an ID, it will generate an unique ID.
+
+Container node shall pass the Dockerfile to the bridge.
+
+Container node shall create Peripheral IDs for all attached Peripherals,
+pass them onto the bridge and take create streams for those Peripherals.
+
+Consult Peripheral definition to how will container node behave towards
+Peripherals.
+
+Container nodes shall provide a `void HotCode(string command)`
+which shall execute a command on the target container, without live TTY attached.
+
+### Peripherals
+
+Peripherals are not created by the plugin maintainer,
+they are created by plugin user and hooked into the container nodes by
+the user.
+
+Peripheral can be any node that has the following methods:
+
+`void peripheral_initialization(string peripheral_id, FuncRef sending_function)`
+
+`void peripheral_receive(string data)`
+
+Peripherals may use the `void sending_function(string id, string message)`
+to send data to the container. In which case, peripherals MUST identify
+themselves by their ID, assigned on `peripheral_initialization`.
+ 
+Container node shall call `peripheral_receive` on any data it receives from the container.
+
+### Terminal Control
+
+Shall provide a `public void Open(ContainerNode container)` for opening
+this terminal attached to this container.
+
+Shall route ALL input to the attached container.
+(Including ESC, CTRL and ALT modifiers)
+
+Shall be closed by either GUI control of by SHIFT+ESC.

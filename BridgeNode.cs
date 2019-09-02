@@ -1,6 +1,6 @@
 using Godot;
 
-public class BridgeWrapper : Node
+public class BridgeNode : Node
 {
     public static bool Attached;
 

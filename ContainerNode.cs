@@ -44,27 +44,27 @@ public class ContainerNode : Spatial
         }
         
         // Boot VM if not booted already
-        if (BridgeWrapper.DryMode == false && BridgeWrapper.Attached == false)
+        if (BridgeNode.DryMode == false && BridgeNode.Attached == false)
         {
-            GetTree().Root.CallDeferred("add_child", new BridgeWrapper());
-            BridgeWrapper.PreStart();
-            BridgeWrapper.Attached = true;
+            GetTree().Root.CallDeferred("add_child", new BridgeNode());
+            BridgeNode.PreStart();
+            BridgeNode.Attached = true;
         }
     }
 
     public override void _Ready()
     {
-        if (BridgeWrapper.DryMode)
+        if (BridgeNode.DryMode)
             return;
 
-        var status = BridgeWrapper.DockerBridge.CreateContainer(Id, Dockerfile, _peripherals);
+        var status = BridgeNode.DockerBridge.CreateContainer(Id, Dockerfile, _peripherals);
 
         if (status != 0)
         {
             GD.Print($"Container failed to create! - {(Errors) status}");
         }
         
-        status = BridgeWrapper.DockerBridge.StartContainer(Id);
+        status = BridgeNode.DockerBridge.StartContainer(Id);
         
         if (status != 0)
         {
@@ -76,7 +76,7 @@ public class ContainerNode : Spatial
             var node = pair.Value;
             var id = pair.Key;
 
-            var writer = BridgeWrapper.DockerBridge.GetPeripheralOutgoingStream(Id, id);
+            var writer = BridgeNode.DockerBridge.GetPeripheralOutgoingStream(Id, id);
             _peripheralWriters.Add(id, writer);
             
             node.Call("peripheral_initialization", id, GD.FuncRef(this, "_sendData"));
@@ -96,13 +96,13 @@ public class ContainerNode : Spatial
     /// <param name="command"></param>
     public void HotCode(string command)
     {
-        if (BridgeWrapper.DryMode)
+        if (BridgeNode.DryMode)
         {
             GD.PrintErr("Dry Mode active, refusing to execute HotCode.");
             return;
         }
 
-        BridgeWrapper.DockerBridge.CreateTTY(Id, out var stdin, out var stdout);
+        BridgeNode.DockerBridge.CreateTTY(Id, out var stdin, out var stdout);
         stdin.WriteLine(command);
         stdin.Close();
         stdout.Close();
@@ -130,7 +130,7 @@ public class ContainerNode : Spatial
     {
         while (_running)
         {
-            var ingoing = BridgeWrapper.DockerBridge.GetPeripheralIngoingStream(Id, peripheral);
+            var ingoing = BridgeNode.DockerBridge.GetPeripheralIngoingStream(Id, peripheral);
 
             while (ingoing != null && !ingoing.EndOfStream)
             {

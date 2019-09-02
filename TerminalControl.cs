@@ -30,7 +30,7 @@ public class TerminalControl : Control
 
     public void Open(ContainerNode computer)
     {
-        if (BridgeWrapper.DryMode)
+        if (BridgeNode.DryMode)
         {
             GD.PrintErr("Dry Mode active, refusing to open a terminal.");
             return;
@@ -43,7 +43,7 @@ public class TerminalControl : Control
             return;
         }
 
-        BridgeWrapper.DockerBridge.CreateTTY(computer.Id, out var stdin, out var stdout, true);
+        BridgeNode.DockerBridge.CreateTTY(computer.Id, out var stdin, out var stdout, true);
 
         _currentTerminal = new Terminal((int) (RectSize.x / FontSizeX), (int) (RectSize.y / FontSizeY));
         _currentTerminal.ScreenUpdated += Update;
