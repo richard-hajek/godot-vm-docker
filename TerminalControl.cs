@@ -28,7 +28,7 @@ public class TerminalControl : Control
     public float FontSizeX => Font.GetStringSize("X").x + 1;
     public float FontSizeY => Font.GetStringSize("X").y + 2;
 
-    public void Open(ContainerNode computer)
+    public void Open(ContainerNode container)
     {
         if (BridgeNode.DryMode)
         {
@@ -36,20 +36,20 @@ public class TerminalControl : Control
             return;
         }
 
-        if (_terminals.ContainsKey(computer))
+        if (_terminals.ContainsKey(container))
         {
-            _currentTerminal = _terminals[computer];
+            _currentTerminal = _terminals[container];
             Visible = true;
             return;
         }
 
-        BridgeNode.DockerBridge.CreateTTY(computer.Id, out var stdin, out var stdout, true);
+        BridgeNode.DockerBridge.CreateTTY(container.Id, out var stdin, out var stdout, true);
 
         _currentTerminal = new Terminal((int) (RectSize.x / FontSizeX), (int) (RectSize.y / FontSizeY));
         _currentTerminal.ScreenUpdated += Update;
         _currentTerminal.Open(stdin, stdout);
 
-        _terminals.Add(computer, _currentTerminal);
+        _terminals.Add(container, _currentTerminal);
 
         Visible = true;
     }

@@ -91,7 +91,7 @@ public class ContainerNode : Spatial
     }
     
     /// <summary>
-    /// Sends a singular command to a computer
+    /// Sends a singular command to a container
     /// </summary>
     /// <param name="command"></param>
     public void HotCode(string command)

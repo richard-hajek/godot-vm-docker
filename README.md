@@ -6,9 +6,8 @@ It is a base for an upcoming game called *Hackfest*!
 
 ## Info
 - Natively allows one to use *Dockerfiles* within the editor
-- In-game objects can be made computer peripherals - making them accessible from within the container
+- In-game objects can be made container peripherals - making them accessible from within the container
 - Uses a separate *virtual machine* to run *Docker containers*
-(Meaning you cannot run other VMs without hacking the plugin, main focus is to support multiple Docker containers)
 - Does *NOT* require privileges to run (achieving that was rough)
 
 ## Dependencies
@@ -32,22 +31,28 @@ you can use add this repo as submodule.
 ## Usage
 
 1. Enable plugin in Project -> Project Settings -> Plugins
-2. Add node `Computer`
-3. Open the `Computer` node in inspector, set a Dockerfile, for example:
+2. Add node `Container`
+3. Open the `Container` node in inspector, set a Dockerfile, for example:
  ```
  FROM busybox
  CMD sh
  ```
 4. Add control `Terminal`
-5. When you want to open a terminal for a computer execute `terminalNode.Open(computerNode)`
+5. When you want to open a terminal for a container execute `terminalNode.Open(containerNode)`
 
 ## Specification
 
-See Specifications.md detailed description of relevant classes.
+See [Specifications](./Specifications.md) detailed description of relevant classes.
 
-## Troubleshooting
+## FAQ
 
-### Godot build fails with `The type or namespace name 'VagrantBridge' could not be found` (or similar)
+### Why are you talking about VMs and Docker at the same time? They are different concepts
+
+Yes. I use a VM to boot a machine that has Docker installed.
+This way this plugin can pretty much do anything with said Docker and not damage anything.
+Also this enables this plugin to run without admin privileges.
+
+### Project build fails with `The type or namespace name 'VagrantBridge' could not be found` (or similar)
 
 This is caused by missing references in `.csproj` file.
 One needs to reference `.cs` files, because Godot does not do that automatically.
@@ -56,16 +61,16 @@ Search your `.csproj` file for lines like so:
 
 ```
   <ItemGroup>
-    <Compile Include="addons\godot-virtual-machines\BridgeContainer.cs"/>
+    <Compile Include="addons\godot-vm-docker\BridgeContainer.cs"/>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
 ```
 
-And replace any `<Compile Include="addons\godot-virtual-machines\<anything>.cs">`
+And replace any `<Compile Include="addons\godot-vm-docker\<anything>.cs">`
 with just `<Compile Include="addons\**\*.cs"/>`
 
 ### Scene takes forever to load!
-The computer nodes need to complete their boot processes.
+The container nodes need to complete their boot processes.
 If you wish you can call `BridgeWrapper.PreStart()` which will preboot the VM.
 
 ### The VM stays running even after the game was killed!

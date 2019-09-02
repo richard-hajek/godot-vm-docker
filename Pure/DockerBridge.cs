@@ -28,8 +28,8 @@ public class DockerBridge
 
     public int CreateContainer(string customId, string dockerfile, IList<string> peripheralIds)
     {
-        VagrantController.PrepareComputerDir(customId, dockerfile);
-        VagrantController.PreparePeripheralDir(customId);
+        VagrantController.PrepareContainerDirectory(customId, dockerfile);
+        VagrantController.PreparePeripheralDirectory(customId);
 
         foreach (var peripheral in peripheralIds)
             VagrantController.PreparePeripheral(customId, peripheral);
@@ -196,7 +196,7 @@ public class DockerBridge
     private static class VagrantController
     {
         private const string VIRTUAL_MACHINE_IMAGE = "ailispaw/barge";
-        private const string VAGRANT_COMPUTERS_MOUNT = "/hackfest";
+        private const string VAGRANT_CONTAINERS_MOUNT = "/hackfest";
         private const string VAGRANT_DEVICES_FOLDER = "/v_dev";
         private const string CONTAINER_DEV_MOUNT = "/dev/per";
 
@@ -242,7 +242,7 @@ public class DockerBridge
 
         public static void DockerImageBuild(string path, out string imageId)
         {
-            _inVagrantExecute($"cd {VAGRANT_COMPUTERS_MOUNT}/{path} && docker build -q ./", out _, out var stdout,
+            _inVagrantExecute($"cd {VAGRANT_CONTAINERS_MOUNT}/{path} && docker build -q ./", out _, out var stdout,
                 out var stderr);
             imageId = stdout.ReadLine();
 
@@ -318,22 +318,22 @@ public class DockerBridge
             return current == wouldBeNew;
         }
 
-        private static void UpdateVagrantfile(string computersPath)
+        private static void UpdateVagrantfile(string containerPath)
         {
             if (!VagrantFolderExists())
                 Directory.CreateDirectory(GetVagrantPath());
 
             var vagrantfilePath = Path.Combine(GetVagrantPath(), "Vagrantfile");
-            var vagrantfile = _generateVagrantfile(computersPath);
+            var vagrantfile = _generateVagrantfile(containerPath);
 
             File.WriteAllText(vagrantfilePath, vagrantfile);
         }
 
-        private static string _generateVagrantfile(string computersPath)
+        private static string _generateVagrantfile(string containerPath)
         {
             return "Vagrant.configure(\"2\") do |config| \n" +
                    $"\tconfig.vm.box = \"{VIRTUAL_MACHINE_IMAGE}\" \n" +
-                   $"\tconfig.vm.synced_folder \"{computersPath}\", \"{VAGRANT_COMPUTERS_MOUNT}\"\n" +
+                   $"\tconfig.vm.synced_folder \"{containerPath}\", \"{VAGRANT_CONTAINERS_MOUNT}\"\n" +
                    "end\n";
         }
 
@@ -342,14 +342,14 @@ public class DockerBridge
             _inVagrantExecute($"docker network create {netName}").WaitForExit();
         }
 
-        public static void DockerNetworkConnect(string computerIdentifier, string netName)
+        public static void DockerNetworkConnect(string containerId, string netName)
         {
-            _inVagrantExecute($"docker network connect {netName} {computerIdentifier}").WaitForExit();
+            _inVagrantExecute($"docker network connect {netName} {containerId}").WaitForExit();
         }
 
-        public static void DockerNetworkDisconnect(string computerIdentifier, string netName)
+        public static void DockerNetworkDisconnect(string containerId, string netName)
         {
-            _inVagrantExecute($"ssh -c \"docker network disconnect {netName} {computerIdentifier}").WaitForExit();
+            _inVagrantExecute($"ssh -c \"docker network disconnect {netName} {containerId}").WaitForExit();
         }
 
         public static void DockerNetworkRemove(string netName)
@@ -369,7 +369,7 @@ public class DockerBridge
             _inVagrantExecute($"sudo iptables -D FORWARD -s {ip2} -j TEE --gateway {eavesdroppingIP}").WaitForExit();
         }
 
-        public static void PreparePeripheralDir(string pcPath)
+        public static void PreparePeripheralDirectory(string pcPath)
         {
             _inVagrantExecute($"mkdir -p {VAGRANT_DEVICES_FOLDER}/{pcPath}").WaitForExit();
         }
@@ -491,14 +491,14 @@ public class DockerBridge
             return sshProcess;
         }
 
-        public static void PrepareComputerDir(string id, string dockerfile)
+        public static void PrepareContainerDirectory(string id, string dockerfile)
         {
-            var computerDirectory = Path.Combine(WorkingDirectory, id);
-            if (Directory.Exists(computerDirectory))
-                Directory.Delete(computerDirectory, true);
+            var containerDirectory = Path.Combine(WorkingDirectory, id);
+            if (Directory.Exists(containerDirectory))
+                Directory.Delete(containerDirectory, true);
 
-            Directory.CreateDirectory(computerDirectory);
-            File.WriteAllText(Path.Combine(computerDirectory, "Dockerfile"), dockerfile);
+            Directory.CreateDirectory(containerDirectory);
+            File.WriteAllText(Path.Combine(containerDirectory, "Dockerfile"), dockerfile);
         }
     }
 }
