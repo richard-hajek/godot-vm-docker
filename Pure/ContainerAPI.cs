@@ -206,7 +206,7 @@ public class ContainerAPI
         private const string VIRTUAL_MACHINE_IMAGE = "ailispaw/barge";
         private const string VAGRANT_CONTAINERS_MOUNT = "/hackfest";
         private const string VAGRANT_DEVICES_FOLDER = "/v_dev";
-        private const string CONTAINER_DEV_MOUNT = "/dev/per";
+        private const string CONTAINER_DEV_MOUNT = "/dev/by_id";
 
         private static readonly string WorkingDirectory = Path.Combine(GameFiles.UserDirectoryPath, "map");
 

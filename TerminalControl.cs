@@ -26,7 +26,7 @@ public class TerminalControl : Control
 	}
 
 	public float FontSizeX => Font.GetStringSize("X").x + 1;
-	public float FontSizeY => Font.GetStringSize("X").y + 2;
+	public float FontSizeY => Font.GetStringSize("X").y + 3;
 
 	public void Open(ContainerNode container)
 	{
@@ -84,7 +84,7 @@ public class TerminalControl : Control
 				var posX = pointerX * FontSizeX;
 				var posY = pointerY * FontSizeY;
 
-				DrawRect(new Rect2(posX, posY, FontSizeX, FontSizeY), glyph.BackgroundColor);
+				DrawRect(new Rect2(posX, posY, FontSizeX - 10, FontSizeY - 10), glyph.BackgroundColor);
 				DrawString(Font, new Vector2(posX, posY + FontSizeY), glyph.Character + "", glyph.ForegroundColor);
 				pointerX++;
 			}
@@ -107,9 +107,43 @@ public class TerminalControl : Control
 
 			if (!key.Pressed)
 				return;
+			
+			if (key.Scancode == (int) KeyList.Up)
+			{
+				_currentTerminal.OnInput((char) ASCII.ESC);
+				_currentTerminal.OnInput('[');
+				_currentTerminal.OnInput('A');
+				return;
+			}
+			
+			if (key.Scancode == (int) KeyList.Down)
+			{
+				_currentTerminal.OnInput((char) ASCII.ESC);
+				_currentTerminal.OnInput('[');
+				_currentTerminal.OnInput('B');
+				return;
+			}
+			
+			
+			if (key.Scancode == (int) KeyList.Right)
+			{
+				_currentTerminal.OnInput((char) ASCII.ESC);
+				_currentTerminal.OnInput('[');
+				_currentTerminal.OnInput('C');
+				return;
+			}
+
+			if (key.Scancode == (int) KeyList.Left)
+			{
+				_currentTerminal.OnInput((char) ASCII.ESC);
+				_currentTerminal.OnInput('[');
+				_currentTerminal.OnInput('D');
+				return;
+			}
 
 			if (key.Scancode == (int) KeyList.Escape && key.Shift)
 			{
+				Input.SetMouseMode(Input.MouseMode.Captured);
 				Close();
 				return;
 			}
@@ -119,6 +153,9 @@ public class TerminalControl : Control
 
 			var character = (char) key.Unicode;
 
+			if (key.Scancode == (int) KeyList.Tab)
+				character = (char) ASCII.TAB;
+			
 			if (key.Scancode == (int) KeyList.Enter)
 				character = (char) ASCII.LF;
 
