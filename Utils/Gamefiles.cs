@@ -24,6 +24,19 @@ public class GameFiles
         }
     }
 
+    public static string CustomWorkingDirectory
+    {
+        get
+        {
+            var directory = Path.Combine(UserDirectoryPath, "workingd");
+
+            if (!Directory.Exists(directory))
+                Directory.CreateDirectory(directory);
+            
+            return directory;
+            
+        }
+    }
 
     private static string _getHomeDirectory()
     {

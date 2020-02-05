@@ -14,7 +14,7 @@ public enum Errors
     ImageBuildError
 }
 
-public class DockerBridge
+public class ContainerAPI
 {
     private readonly Dictionary<string, string> _containersIds = new Dictionary<string, string>();
 
@@ -26,16 +26,19 @@ public class DockerBridge
         VagrantController.VagrantPrepare();
     }
 
-    public int CreateContainer(string customId, string dockerfile, IList<string> peripheralIds)
+    public int CreateContainer(string customId, string workingDirectory, string dockerfile, IList<string> peripheralIds)
     {
         VagrantController.PrepareContainerDirectory(customId, dockerfile);
         VagrantController.PreparePeripheralDirectory(customId);
 
         foreach (var peripheral in peripheralIds)
             VagrantController.PreparePeripheral(customId, peripheral);
-
+        
+        if (!string.IsNullOrEmpty(workingDirectory))
+            VagrantController.CopyBuildContext(workingDirectory, customId);
+        
         VagrantController.DockerImageBuild(customId, out var imageId);
-
+        
         if (string.IsNullOrEmpty(imageId))
             return (int) Errors.ImageBuildError;
 
@@ -193,6 +196,11 @@ public class DockerBridge
         return VagrantController.GetPeripheralOutstream(peripheralId, containerId);
     }
 
+    public string VagrantDebugExecute(string command)
+    {
+        return VagrantController.DebugExecute(command);
+    }
+
     private static class VagrantController
     {
         private const string VIRTUAL_MACHINE_IMAGE = "ailispaw/barge";
@@ -240,6 +248,30 @@ public class DockerBridge
             _command("vagrant", "halt", true);
         }
 
+        public static void CopyBuildContext(string workingDirectory, string customId)
+        {
+            var destination = Path.Combine(WorkingDirectory, customId);
+            
+            foreach (var dir in Directory.GetDirectories(workingDirectory, "*", SearchOption.AllDirectories))
+                Directory.CreateDirectory(Path.Combine(destination, dir.Substring(workingDirectory.Length + 1)));
+
+            foreach (var fileName in Directory.GetFiles(workingDirectory, "*", SearchOption.AllDirectories))
+                File.Copy(fileName, Path.Combine(destination, fileName.Substring(workingDirectory.Length + 1)));
+        }
+
+        private static void _recursiveDirCopy(string source, string destination)
+        {
+            
+            if (!Directory.Exists(destination))
+                Directory.CreateDirectory(destination);
+            
+            foreach (var file in Directory.GetFiles(source))
+                File.Copy(file, Path.Combine(destination, file), true);
+
+            foreach (var dir in Directory.GetDirectories(source))
+                _recursiveDirCopy(dir, Path.Combine(destination, dir));
+        }
+
         public static void DockerImageBuild(string path, out string imageId)
         {
             _inVagrantExecute($"cd {VAGRANT_CONTAINERS_MOUNT}/{path} && docker build -q ./", out _, out var stdout,
@@ -256,9 +288,7 @@ public class DockerBridge
             if (!mountDev)
                 _inVagrantExecute($"docker create -it {imageId}", out _, out stdout, out _);
             else
-                _inVagrantExecute(
-                    $"docker create -it -v {VAGRANT_DEVICES_FOLDER}/{pcPath}/:{CONTAINER_DEV_MOUNT} {imageId}", out _,
-                    out stdout, out _);
+                _inVagrantExecute($"docker create -it -v {VAGRANT_DEVICES_FOLDER}/{pcPath}/:{CONTAINER_DEV_MOUNT} {imageId}", out _, out stdout, out _);
             containerId = stdout.ReadLine();
         }
 
@@ -499,6 +529,39 @@ public class DockerBridge
 
             Directory.CreateDirectory(containerDirectory);
             File.WriteAllText(Path.Combine(containerDirectory, "Dockerfile"), dockerfile);
+        }
+
+        public static string DebugExecute(string command)
+        {
+            var sshProcess = new Process
+            {
+                StartInfo =
+                {
+                    UseShellExecute = false,
+                    FileName = "ssh",
+                    Arguments =
+                        $"-o UserKnownHostsFile=/dev/null -o \"StrictHostKeyChecking no\" bargee@127.0.0.1 -p 2222 -i .vagrant/machines/default/virtualbox/private_key \"{command}\"",
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    WorkingDirectory = GetVagrantPath()
+                }
+            };
+            sshProcess.Start();
+            sshProcess.WaitForExit();
+
+            string output = "";
+
+            if (!sshProcess.StandardOutput.EndOfStream)
+            {
+                output += sshProcess.StandardOutput.ReadToEnd();
+            }
+
+            if (!sshProcess.StandardError.EndOfStream)
+            {
+                output += sshProcess.StandardError.ReadToEnd();
+            }
+
+            return output;
         }
     }
 }

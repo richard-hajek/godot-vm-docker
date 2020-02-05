@@ -14,7 +14,7 @@ public class BridgeNode : Node
         }
     }
 
-    public static DockerBridge DockerBridge { get; private set; }
+    public static ContainerAPI ContainerApi { get; private set; }
 
     public static void PreStart()
     {
@@ -29,17 +29,22 @@ public class BridgeNode : Node
 
     private static void _begin()
     {
-        if (DockerBridge != null)
+        if (ContainerApi != null)
             return;
 
-        DockerBridge = new DockerBridge();
-        DockerBridge.Begin();
+        if (ProjectSettings.HasSetting("global/Diagnostics") && (bool) ProjectSettings.GetSetting("global/Diagnostics"))
+        {
+            Diagnostics.Run();
+        }
+        
+        ContainerApi = new ContainerAPI();
+        ContainerApi.Begin();
     }
 
     public override void _ExitTree()
     {
-        DockerBridge.Stop();
-        DockerBridge = null;
+        ContainerApi.Stop();
+        ContainerApi = null;
         Attached = false;
     }
 }

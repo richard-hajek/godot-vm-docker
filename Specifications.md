@@ -84,6 +84,11 @@ Peripherals.
 Container nodes shall provide a `void HotCode(string command)`
 which shall execute a command on the target container, without live TTY attached.
 
+Container nodes can be provided a working directory name.
+Container nodes shall use working directory name and environment variables to construct working directory path
+`~/.local/share/Hackfest/workingd/{working directory name}`
+Containers shall copy all content from working directory to Dockerfile's build context.
+
 ### Peripherals
 
 Peripherals are not created by the plugin maintainer,
